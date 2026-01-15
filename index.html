@@ -727,6 +727,34 @@ with(DATA, wilcox.test(TIME ~ STATUS))
       }
 
     ];
+{
+  id: "survival_hist_compare_died_survived",
+  name: "Histogram of survival times + compare died vs survived (Wilcoxon)",
+  keywords: [
+    /histogram/i,
+    /survival times/i,
+    /compare/i,
+    /distribution/i,
+    /died/i,
+    /survived/i,
+    /follow-?up/i
+  ],
+  code: `# Step 1
+
+hist(DATA$TIME)
+
+# Step 2
+# Compare distributions by outcome
+
+with(DATA, summary(TIME[STATUS==0]))
+with(DATA, summary(TIME[STATUS==1]))
+
+# Step 3
+# Non-parametric comparison
+
+with(DATA, wilcox.test(TIME ~ STATUS))
+`
+},
 
     function compileRegex(rx, caseSensitive) {
       if (!(rx instanceof RegExp)) return null;
