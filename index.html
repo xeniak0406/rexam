@@ -4,42 +4,355 @@
   <meta charset="utf-8" />
   <title>R Exam Templates</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 24px; }
-    textarea { width: 100%; height: 180px; }
-    pre { background: #f5f5f5; padding: 12px; overflow: auto; }
-    .card { border: 1px solid #ddd; padding: 12px; margin-top: 12px; }
+    body { font-family: Arial, sans-serif; margin: 24px; max-width: 980px; }
+    textarea { width: 100%; height: 180px; padding: 10px; font-size: 14px; }
+    pre { background: #f5f5f5; padding: 12px; overflow: auto; white-space: pre; }
+    .card { border: 1px solid #ddd; padding: 12px; margin-top: 12px; border-radius: 8px; }
     button { padding: 8px 12px; cursor: pointer; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin: 12px 0; }
+    .pill { display: inline-block; padding: 4px 8px; border: 1px solid #ddd; border-radius: 999px; font-size: 12px; color: #333; background: #fafafa; }
+    .muted { color: #666; font-size: 13px; }
+    input[type="checkbox"] { transform: scale(1.1); }
+    code.inline { background: #f5f5f5; padding: 2px 6px; border-radius: 6px; }
   </style>
 </head>
 <body>
   <h1>R Exam Templates (No AI)</h1>
+  <div class="muted">
+    Paste the exam question text below. This tool does deterministic keyword/regex matching and shows prewritten templates.
+    Replace placeholders like <code class="inline">DATA</code>, <code class="inline">OUTCOME</code>, <code class="inline">TIME</code>, etc.
+  </div>
 
-  <p>Paste the task text:</p>
-  <textarea id="task"></textarea>
-  <br><br>
-  <button onclick="matchTask()">Find templates</button>
+  <p><b>Paste the task text:</b></p>
+  <textarea id="task" placeholder="Paste the exam task here..."></textarea>
+
+  <div class="row">
+    <button onclick="matchTask()">Find templates</button>
+    <button onclick="showAll()">Show all templates</button>
+    <label class="muted"><input id="caseSensitive" type="checkbox" /> Case-sensitive matching</label>
+    <span id="count" class="pill"></span>
+  </div>
 
   <div id="results"></div>
 
   <script>
+    // Placeholders you will replace in RStudio during the exam:
+    // DATA, FILE, OUTCOME, TIME, EVENT, GROUP, VARIABLE, EXPOSURES, MARKER, TEST, DISEASE
+
     const templates = [
+
+      // -------------------------
+      // Loading / quick checks
+      // -------------------------
       {
-        id: "km_logrank",
-        name: "Kaplan–Meier + log-rank",
-        keywords: [/kaplan/i, /log\s*rank/i, /survdiff/i, /survival curve/i],
+        id: "load_excel_count_rows",
+        name: "Load Excel (.xlsx) + count rows",
+        keywords: [
+          /load.*(dataset|data).*excel/i,
+          /read_excel/i,
+          /how many (patients|observations|rows)/i,
+          /copy.*dataset.*xlsx/i
+        ],
         code: `# Step 1
 
-library(survival)
-s1 <- survfit(Surv(TIME, OUTCOME) ~ GROUP, data=DATA)
-summary(s1)
-plot(s1)
-survdiff(Surv(TIME, OUTCOME) ~ GROUP, data=DATA)
+library(readxl)
+DATA <- as.data.frame(read_excel("FILE.xlsx"))
+nrow(DATA)
 `
       },
       {
-        id: "glm_binomial",
+        id: "load_rdata",
+        name: "Load .RData file",
+        keywords: [
+          /load.*rdata/i,
+          /copy.*dataset.*rdata/i
+        ],
+        code: `# Step 1
+
+load("FILE.RData")
+`
+      },
+      {
+        id: "summary_tables_quick",
+        name: "Quick dataset overview: summary() + outcome table",
+        keywords: [
+          /familiarize/i,
+          /data dictionary/i,
+          /summary\(/i,
+          /jot down/i
+        ],
+        code: `# Step 1
+
+summary(DATA)
+table(DATA$OUTCOME)
+`
+      },
+
+      // -------------------------
+      // Descriptive tables & tests
+      // -------------------------
+      {
+        id: "table_oneway",
+        name: "One-way frequency table",
+        keywords: [
+          /frequency table/i,
+          /table.*for/i,
+          /vaccination status/i,
+          /number of vaccine doses/i,
+          /sex.*frequency/i
+        ],
+        code: `# Step 1
+
+table(DATA$VARIABLE)
+`
+      },
+      {
+        id: "table_twoway_basic",
+        name: "Two-way contingency table (with() syntax)",
+        keywords: [
+          /contingency table/i,
+          /association between/i,
+          /table\(/i,
+          /examining the association/i
+        ],
+        code: `# Step 1
+
+with(DATA, table(EXPOSURE, OUTCOME))
+`
+      },
+      {
+        id: "rowwise_percentages",
+        name: "Row-wise percentages from a 2-way table",
+        keywords: [
+          /row-wise/i,
+          /rowwise/i,
+          /percentages/i,
+          /mortality rate/i,
+          /death rate/i
+        ],
+        code: `# Step 1
+
+tb <- with(DATA, table(GROUP, OUTCOME))
+tb
+
+# Row-wise percentages
+tb[,1] / rowSums(tb)
+tb[,2] / rowSums(tb)
+`
+      },
+      {
+        id: "chisq_fisher",
+        name: "Chi-square test / Fisher test (with sim=TRUE option)",
+        keywords: [
+          /chi-?square/i,
+          /chisq\.test/i,
+          /fisher\.test/i,
+          /cell values < ?5/i,
+          /test for that association/i
+        ],
+        code: `# Step 1
+
+tb <- with(DATA, table(VARIABLE1, VARIABLE2))
+tb
+
+chisq.test(tb)
+
+# If chi-square is not appropriate (e.g. small cell counts):
+fisher.test(tb)
+
+# If fisher.test complains due to table size / mixed counts:
+fisher.test(tb, sim = TRUE)
+`
+      },
+
+      // -------------------------
+      // Continuous variable distribution & comparisons
+      // -------------------------
+      {
+        id: "hist_qq",
+        name: "Histogram + Q-Q plot (normality check)",
+        keywords: [
+          /explore.*distribution/i,
+          /are these distributions normal/i,
+          /qq\s*-?\s*plot/i,
+          /qqnorm/i,
+          /histogram/i
+        ],
+        code: `# Step 1
+
+hist(DATA$VARIABLE)
+qqnorm(DATA$VARIABLE)
+qqline(DATA$VARIABLE)
+`
+      },
+      {
+        id: "boxplot_formula",
+        name: "Boxplot by group (formula syntax)",
+        keywords: [
+          /box ?plot/i,
+          /boxplot/i,
+          /formula syntax.*boxplot/i
+        ],
+        code: `# Step 1
+
+boxplot(VARIABLE ~ GROUP, data=DATA)
+`
+      },
+      {
+        id: "wilcoxon_2group",
+        name: "Wilcoxon / Mann–Whitney test (2 groups) + formula syntax",
+        keywords: [
+          /wilcoxon/i,
+          /mann-?whitney/i,
+          /compare.*distribution/i,
+          /distribution.*between/i,
+          /compare the distribution/i,
+          /non[- ]?parametric/i
+        ],
+        code: `# Step 1
+
+wilcox.test(VARIABLE ~ GROUP, data=DATA)
+
+# Alternative syntax
+
+with(DATA, wilcox.test(VARIABLE[GROUP==0], VARIABLE[GROUP==1]))
+`
+      },
+
+      // -------------------------
+      // Correlation & linear regression (week 8 style)
+      // -------------------------
+      {
+        id: "scatter_jitter_with",
+        name: "Scatterplot with jitter() + with()",
+        keywords: [
+          /scatterplot/i,
+          /jitter\(/i,
+          /make a scatterplot/i
+        ],
+        code: `# Step 1
+
+with(DATA, plot(jitter(X), Y))
+`
+      },
+      {
+        id: "cor_pearson_spearman",
+        name: "Pearson & Spearman correlation + cor.test() (Pearson CI)",
+        keywords: [
+          /pearson/i,
+          /spearman/i,
+          /correlation coefficient/i,
+          /cor\.test/i
+        ],
+        code: `# Step 1
+
+with(DATA, cor(X, Y, use="complete.obs"))
+with(DATA, cor(X, Y, use="complete.obs", method="spearman"))
+
+# 95% CI for Pearson is provided by cor.test()
+with(DATA, cor.test(X, Y))
+
+# Spearman (no CI; exact=FALSE commonly used)
+with(DATA, cor.test(X, Y, method="spearman", exact=FALSE))
+`
+      },
+      {
+        id: "lm_simple_getci_abline",
+        name: "Simple linear regression + getCI() + abline()",
+        keywords: [
+          /simple linear regression/i,
+          /\blm\(/i,
+          /regression line/i,
+          /how much.*increase/i,
+          /confidence interval/i
+        ],
+        code: `# Step 1
+
+m1 <- lm(Y ~ X, data=DATA)
+summary(m1)
+
+# Step 2
+
+source("getCI.R")
+getCI(m1)
+
+# Step 3
+
+abline(m1)
+`
+      },
+      {
+        id: "lm_multivariable_interaction_lrt",
+        name: "Multivariable linear regression + interaction + LRT (anova test='LRT')",
+        keywords: [
+          /interaction/i,
+          /effect modification/i,
+          /different for/i,
+          /likelihood ratio test/i,
+          /anova\(.*test\s*=\s*["']LRT["']/i
+        ],
+        code: `# Step 1
+
+m2 <- lm(Y ~ X + Z, data=DATA)
+summary(m2)
+
+# Step 2
+
+m3 <- lm(Y ~ X + Z + X:Z, data=DATA)
+summary(m3)
+
+# Step 3
+
+anova(m2, m3, test="LRT")
+`
+      },
+
+      // -------------------------
+      // Logistic regression & odds ratios (weeks 9/12 style)
+      // -------------------------
+      {
+        id: "relevel_reference",
+        name: "Set reference category with relevel()",
+        keywords: [
+          /appropriate reference/i,
+          /use relevel/i,
+          /reference category/i
+        ],
+        code: `# Step 1
+
+DATA$FACTORVAR <- relevel(DATA$FACTORVAR, "REFERENCE_LEVEL")
+table(DATA$FACTORVAR)
+`
+      },
+      {
+        id: "oddsratio_epitools",
+        name: "Odds Ratio + 95% CI from a contingency table (epitools)",
+        keywords: [
+          /odds ratio/i,
+          /95% CI/i,
+          /epitools/i,
+          /oddsratio/i
+        ],
+        code: `# Step 1
+
+library(epitools)
+tb <- with(DATA, table(EXPOSURE, OUTCOME))
+tb
+
+oddsratio(tb)
+`
+      },
+      {
+        id: "glm_binomial_factor_getci",
         name: "Logistic regression (binomial) + OR via getCI()",
-        keywords: [/logistic/i, /glm/i, /odds ratio/i, /binomial/i],
+        keywords: [
+          /logistic/i,
+          /glm/i,
+          /binomial/i,
+          /multivariable/i,
+          /adjusted/i,
+          /odds ratio/i
+        ],
         code: `# Step 1
 
 m1 <- glm(OUTCOME ~ EXPOSURES, data=DATA, family="binomial")
@@ -51,49 +364,430 @@ source("getCI.R")
 round(exp(getCI(m1)), 2)
 `
       },
-            {
-        id: "wilcoxon",
-        name: "Wilcoxon / Mann–Whitney test (2 groups)",
+      {
+        id: "glm_compare_models_lrt",
+        name: "Compare nested logistic models via LRT (anova test='LRT')",
         keywords: [
-          /wilcoxon/i,
-          /mann/i,
-          /compare distribution/i,
-          /non[- ]?parametric/i
+          /better fit/i,
+          /compare.*model/i,
+          /likelihood ratio test/i,
+          /anova\(.*test\s*=\s*["']LRT["']/i
         ],
         code: `# Step 1
 
-wilcox.test(VARIABLE ~ GROUP, data=DATA)
+m1 <- glm(OUTCOME ~ EXPOSURES1, data=DATA, family="binomial")
+m2 <- glm(OUTCOME ~ EXPOSURES2, data=DATA, family="binomial")
 
-# Alternative syntax
+anova(m1, m2, test="LRT")
+`
+      },
 
-with(DATA, wilcox.test(VARIABLE[GROUP==0], VARIABLE[GROUP==1]))
+      // -------------------------
+      // Survival analysis (weeks 10/12 style)
+      // -------------------------
+      {
+        id: "km_overall",
+        name: "Kaplan–Meier curve overall (no grouping)",
+        keywords: [
+          /kaplan/i,
+          /survfit/i,
+          /final survival/i,
+          /survival curve.*all/i
+        ],
+        code: `# Step 1
+
+library(survival)
+s1 <- survfit(Surv(TIME, EVENT) ~ 1, data=DATA)
+plot(s1)
+summary(s1)
+`
+      },
+      {
+        id: "cumhaz_nelson_aalen",
+        name: "Nelson–Aalen cumulative hazard curve (plot(..., cumhaz=TRUE))",
+        keywords: [
+          /nelson-?aalen/i,
+          /cumulative hazard/i,
+          /cumhaz/i
+        ],
+        code: `# Step 1
+
+library(survival)
+s1 <- survfit(Surv(TIME, EVENT) ~ 1, data=DATA)
+plot(s1, cumhaz=TRUE)
+`
+      },
+      {
+        id: "km_group_logrank",
+        name: "Kaplan–Meier curves by group + log-rank test",
+        keywords: [
+          /plot.*kaplan/i,
+          /kaplan.*by/i,
+          /log\s*rank/i,
+          /survdiff/i,
+          /compare.*survival/i
+        ],
+        code: `# Step 1
+
+library(survival)
+s1 <- survfit(Surv(TIME, EVENT) ~ GROUP, data=DATA)
+summary(s1)
+
+# Step 2
+
+plot(s1)
+
+# Step 3
+
+survdiff(Surv(TIME, EVENT) ~ GROUP, data=DATA)
+`
+      },
+      {
+        id: "km_median_survival",
+        name: "Median survival time by group (from summary(survfit))",
+        keywords: [
+          /median survival/i,
+          /what is the median/i
+        ],
+        code: `# Step 1
+
+library(survival)
+s1 <- survfit(Surv(TIME, EVENT) ~ GROUP, data=DATA)
+summary(s1)
+
+# Median survival is shown in the summary output (for each stratum if grouped).
+`
+      },
+      {
+        id: "coxph_basic_getci",
+        name: "Cox proportional hazards regression + HR via getCI()",
+        keywords: [
+          /cox/i,
+          /proportional hazards/i,
+          /coxph/i,
+          /hazard ratio/i
+        ],
+        code: `# Step 1
+
+library(survival)
+m1 <- coxph(Surv(TIME, EVENT) ~ EXPOSURES, data=DATA)
+summary(m1)
+
+# Step 2
+
+source("getCI.R")
+round(exp(getCI(m1)), 2)
+`
+      },
+      {
+        id: "cox_pred_survival_newdata",
+        name: "Predicted survival curves from Cox model (survfit(model, newdata))",
+        keywords: [
+          /predicted survival/i,
+          /all combinations/i,
+          /newdata/i
+        ],
+        code: `# Step 1
+
+library(survival)
+m1 <- coxph(Surv(TIME, EVENT) ~ EXPOSURES, data=DATA)
+
+# Step 2
+# Create newdata with required covariate combinations:
+ndat <- data.frame(
+  VAR1 = c("level1","level2"),
+  VAR2 = c("level1","level2")
+)
+ndat
+
+# Step 3
+
+sp <- survfit(m1, ndat)
+plot(sp)
+legend("topright", paste(ndat$VAR1, ndat$VAR2), lwd=1)
+`
+      },
+      {
+        id: "cox_zph",
+        name: "Test proportional hazards assumption (cox.zph)",
+        keywords: [
+          /proportional hazards assumption/i,
+          /cox\.zph/i,
+          /test.*assumption/i
+        ],
+        code: `# Step 1
+
+library(survival)
+m1 <- coxph(Surv(TIME, EVENT) ~ EXPOSURES, data=DATA)
+
+cox.zph(m1)
+`
+      },
+
+      // -------------------------
+      // Diagnostic testing + ROC (week 11 style)
+      // -------------------------
+      {
+        id: "diagnostic_counts",
+        name: "Diagnostic counts: positives + joint positives",
+        keywords: [
+          /how many.*positive/i,
+          /rat/i,
+          /infectious/i,
+          /and infectious/i,
+          /both/i
+        ],
+        code: `# Step 1
+
+table(DATA$TEST)
+table(DATA$DISEASE)
+with(DATA, table(TEST, DISEASE))
+
+# Alternative:
+sum(DATA$TEST)
+sum(DATA$DISEASE)
+sum(DATA$TEST & DATA$DISEASE)
+`
+      },
+      {
+        id: "sens_spec",
+        name: "Sensitivity & specificity (2x2 diagnostic test)",
+        keywords: [
+          /sensitivity/i,
+          /specificity/i
+        ],
+        code: `# Step 1
+
+# Sensitivity: P(TEST=1 | DISEASE=1)
+with(DATA, sum(TEST & DISEASE) / sum(DISEASE))
+
+# Specificity: P(TEST=0 | DISEASE=0)
+with(DATA, sum(!TEST & !DISEASE) / sum(!DISEASE))
+`
+      },
+      {
+        id: "ppv_npv_lr",
+        name: "PPV, NPV, LR(+), LR(-) (diagnostic test)",
+        keywords: [
+          /ppv/i,
+          /npv/i,
+          /likelihood ratio/i,
+          /lr\(\+\)/i,
+          /lr\(-\)/i
+        ],
+        code: `# Step 1
+
+# PPV: P(DISEASE=1 | TEST=1)
+with(DATA, sum(TEST & DISEASE) / sum(TEST))
+
+# NPV: P(DISEASE=0 | TEST=0)
+with(DATA, sum(!TEST & !DISEASE) / sum(!TEST))
+
+# LR(+): sensitivity / (1 - specificity)
+with(DATA, (sum(TEST & DISEASE)/sum(DISEASE)) / (sum(TEST & !DISEASE)/sum(!DISEASE)))
+
+# LR(-): (1 - sensitivity) / specificity
+with(DATA, (sum(!TEST & DISEASE)/sum(DISEASE)) / (sum(!TEST & !DISEASE)/sum(!DISEASE)))
+`
+      },
+      {
+        id: "roc_auc_plot",
+        name: "ROC curve + AUC using pROC::roc()",
+        keywords: [
+          /\broc\b/i,
+          /receiver operating characteristic/i,
+          /auc/i,
+          /pROC/i
+        ],
+        code: `# Step 1
+
+# Install once if needed:
+# install.packages("pROC")
+
+library(pROC)
+r1 <- roc(DISEASE ~ MARKER, data=DATA)
+r1
+plot(r1)
+`
+      },
+      {
+        id: "roc_youden_gmean",
+        name: "Optimal ROC threshold via Youden index & G-mean",
+        keywords: [
+          /youden/i,
+          /g-?mean/i,
+          /optimal.*threshold/i,
+          /maximize/i
+        ],
+        code: `# Step 1
+
+library(pROC)
+r1 <- roc(DISEASE ~ MARKER, data=DATA)
+
+# Step 2
+
+names(r1)
+
+# Youden index:
+J <- r1$sensitivities + r1$specificities - 1
+r1$thresholds[which(J==max(J))]
+r1$sensitivities[which(J==max(J))]
+r1$specificities[which(J==max(J))]
+
+# Step 3
+
+# G-mean:
+G <- sqrt(r1$sensitivities * r1$specificities)
+r1$thresholds[which(G==max(G))]
+r1$sensitivities[which(G==max(G))]
+r1$specificities[which(G==max(G))]
+`
+      },
+      {
+        id: "combine_tests_or_and",
+        name: "Combine two tests: OR vs AND (sensitivity/specificity formulas)",
+        keywords: [
+          /rat.*or.*pcr/i,
+          /pcr.*or.*rat/i,
+          /rat.*and.*pcr/i,
+          /pcr.*and.*rat/i,
+          /combination/i
+        ],
+        code: `# Step 1
+# Define sensitivities/specificities of each test:
+sensA <- SENS_A
+specA <- SPEC_A
+sensB <- SENS_B
+specB <- SPEC_B
+
+# Step 2
+# A OR B:
+sensEither <- sensA + sensB - sensA*sensB
+specEither <- specA * specB
+
+# Step 3
+# A AND B:
+sensBoth <- sensA * sensB
+specBoth <- specA + specB - specA*specB
+`
+      },
+      {
+        id: "lr_product_rule",
+        name: "LR(+) product rule for combined tests",
+        keywords: [
+          /multiply/i,
+          /product/i,
+          /lr\(\+\)/i,
+          /what do you observe/i
+        ],
+        code: `# Step 1
+
+LR.both <- SENS_BOTH / (1 - SPEC_BOTH)
+LR.both
+
+LR.A <- SENS_A / (1 - SPEC_A)
+LR.A
+
+LR.B <- SENS_B / (1 - SPEC_B)
+LR.B
+
+LR.A * LR.B
+`
+      },
+
+      // -------------------------
+      // Week 10 style: histogram of survival times + compare died vs survived
+      // -------------------------
+      {
+        id: "survival_hist_compare_died_survived",
+        name: "Histogram of survival times + compare died vs survived (Wilcoxon)",
+        keywords: [
+          /make a histogram.*survival times/i,
+          /histogram of survival times/i,
+          /compare.*distribution.*between.*died.*survived/i,
+          /survived at the end of their follow-up/i,
+          /distribution of survival times/i
+        ],
+        code: `# Step 1
+
+hist(DATA$TIME)
+
+# Step 2
+
+with(DATA, summary(TIME[STATUS==ALIVE_CODE]))
+with(DATA, summary(TIME[STATUS==DEAD_CODE]))
+
+# Step 3
+# Non-parametric comparison (Mann-Whitney / Wilcoxon)
+
+with(DATA, wilcox.test(TIME[STATUS==ALIVE_CODE], TIME[STATUS==DEAD_CODE]))
+# Or formula syntax:
+with(DATA, wilcox.test(TIME ~ STATUS))
 `
       }
 
     ];
 
+    function compileRegex(rx, caseSensitive) {
+      if (!(rx instanceof RegExp)) return null;
+      const flags = caseSensitive ? rx.flags.replace("i","") : (rx.flags.includes("i") ? rx.flags : rx.flags + "i");
+      return new RegExp(rx.source, flags);
+    }
+
     function matchTask() {
-      const text = document.getElementById("task").value;
+      const text = document.getElementById("task").value || "";
       const out = document.getElementById("results");
       out.innerHTML = "";
+      const caseSensitive = document.getElementById("caseSensitive").checked;
 
-      const matches = templates.filter(t => t.keywords.some(rx => rx.test(text)));
+      const matches = templates.filter(t =>
+        t.keywords.some(rx => {
+          const r = compileRegex(rx, caseSensitive);
+          return r && r.test(text);
+        })
+      );
+
+      document.getElementById("count").innerText = `${matches.length} match(es)`;
 
       if (matches.length === 0) {
-        out.innerHTML = "<p><b>No match.</b> Try adding more keywords (e.g., 'Cox', 'ROC', 'Wilcoxon').</p>";
+        out.innerHTML = `
+          <div class="card">
+            <b>No match.</b>
+            <div class="muted" style="margin-top:8px;">
+              This means your pasted text did not trigger any keywords yet.
+              Add/adjust keywords for that task phrasing.
+              <br/><br/>
+              Tip: Use patterns like <code class="inline">compare.*distribution</code>, <code class="inline">plot.*kaplan</code>, <code class="inline">cox</code>, <code class="inline">roc</code>.
+            </div>
+          </div>
+        `;
         return;
       }
 
-      matches.forEach(t => {
-        const div = document.createElement("div");
-        div.className = "card";
-        div.innerHTML = `
-          <h3>${t.name}</h3>
-          <button onclick="copyCode('${t.id}')">Copy</button>
-          <pre id="code_${t.id}">${escapeHtml(t.code)}</pre>
-        `;
-        out.appendChild(div);
-      });
+      matches.forEach(t => renderTemplate(t));
+    }
+
+    function showAll() {
+      const out = document.getElementById("results");
+      out.innerHTML = "";
+      document.getElementById("count").innerText = `${templates.length} total template(s)`;
+      templates.forEach(t => renderTemplate(t));
+    }
+
+    function renderTemplate(t) {
+      const out = document.getElementById("results");
+      const div = document.createElement("div");
+      div.className = "card";
+      div.innerHTML = `
+        <h3 style="margin:0 0 8px 0;">${escapeHtml(t.name)}</h3>
+        <div class="muted" style="margin-bottom:10px;">
+          Placeholders: <span class="pill">DATA</span> <span class="pill">VARIABLE</span> <span class="pill">GROUP</span>
+          <span class="pill">TIME</span> <span class="pill">EVENT</span> <span class="pill">OUTCOME</span> <span class="pill">EXPOSURES</span>
+        </div>
+        <button onclick="copyCode('${t.id}')">Copy</button>
+        <pre id="code_${t.id}">${escapeHtml(t.code)}</pre>
+      `;
+      out.appendChild(div);
     }
 
     function copyCode(id) {
@@ -103,8 +797,14 @@ with(DATA, wilcox.test(VARIABLE[GROUP==0], VARIABLE[GROUP==1]))
     }
 
     function escapeHtml(s) {
-      return s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+      return String(s)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;");
     }
+
+    // Optional: show template count on load
+    document.getElementById("count").innerText = `${templates.length} total template(s)`;
   </script>
 </body>
 </html>
