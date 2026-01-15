@@ -823,13 +823,14 @@ with(DATA, wilcox.test(TIME ~ STATUS))
       const text = el.innerText;
       navigator.clipboard.writeText(text);
     }
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
 
-    function escapeHtml(s) {
-      return String(s)
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;");
-    }
+    
 
     // Optional: show template count on load
     document.getElementById("count").innerText = `${templates.length} total template(s)`;
