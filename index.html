@@ -1,0 +1,91 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>R Exam Templates</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; }
+    textarea { width: 100%; height: 180px; }
+    pre { background: #f5f5f5; padding: 12px; overflow: auto; }
+    .card { border: 1px solid #ddd; padding: 12px; margin-top: 12px; }
+    button { padding: 8px 12px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>R Exam Templates (No AI)</h1>
+
+  <p>Paste the task text:</p>
+  <textarea id="task"></textarea>
+  <br><br>
+  <button onclick="matchTask()">Find templates</button>
+
+  <div id="results"></div>
+
+  <script>
+    const templates = [
+      {
+        id: "km_logrank",
+        name: "Kaplan–Meier + log-rank",
+        keywords: [/kaplan/i, /log\s*rank/i, /survdiff/i, /survival curve/i],
+        code: `# Step 1
+
+library(survival)
+s1 <- survfit(Surv(TIME, OUTCOME) ~ GROUP, data=DATA)
+summary(s1)
+plot(s1)
+survdiff(Surv(TIME, OUTCOME) ~ GROUP, data=DATA)
+`
+      },
+      {
+        id: "glm_binomial",
+        name: "Logistic regression (binomial) + OR via getCI()",
+        keywords: [/logistic/i, /glm/i, /odds ratio/i, /binomial/i],
+        code: `# Step 1
+
+m1 <- glm(OUTCOME ~ EXPOSURES, data=DATA, family="binomial")
+summary(m1)
+
+# Step 2
+
+source("getCI.R")
+round(exp(getCI(m1)), 2)
+`
+      }
+    ];
+
+    function matchTask() {
+      const text = document.getElementById("task").value;
+      const out = document.getElementById("results");
+      out.innerHTML = "";
+
+      const matches = templates.filter(t => t.keywords.some(rx => rx.test(text)));
+
+      if (matches.length === 0) {
+        out.innerHTML = "<p><b>No match.</b> Try adding more keywords (e.g., 'Cox', 'ROC', 'Wilcoxon').</p>";
+        return;
+      }
+
+      matches.forEach(t => {
+        const div = document.createElement("div");
+        div.className = "card";
+        div.innerHTML = `
+          <h3>${t.name}</h3>
+          <button onclick="copyCode('${t.id}')">Copy</button>
+          <pre id="code_${t.id}">${escapeHtml(t.code)}</pre>
+        `;
+        out.appendChild(div);
+      });
+    }
+
+    function copyCode(id) {
+      const el = document.getElementById("code_" + id);
+      const text = el.innerText;
+      navigator.clipboard.writeText(text);
+    }
+
+    function escapeHtml(s) {
+      return s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+    }
+  </script>
+</body>
+</html>
