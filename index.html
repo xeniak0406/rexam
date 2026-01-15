@@ -50,7 +50,26 @@ summary(m1)
 source("getCI.R")
 round(exp(getCI(m1)), 2)
 `
+      },
+            {
+        id: "wilcoxon",
+        name: "Wilcoxon / Mann–Whitney test (2 groups)",
+        keywords: [
+          /wilcoxon/i,
+          /mann/i,
+          /compare distribution/i,
+          /non[- ]?parametric/i
+        ],
+        code: `# Step 1
+
+wilcox.test(VARIABLE ~ GROUP, data=DATA)
+
+# Alternative syntax
+
+with(DATA, wilcox.test(VARIABLE[GROUP==0], VARIABLE[GROUP==1]))
+`
       }
+
     ];
 
     function matchTask() {
